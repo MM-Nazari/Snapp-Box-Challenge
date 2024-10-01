@@ -1,3 +1,4 @@
+package main;
 public class DistanceCalculator {
 
     // Method to calculate the Haversine distance between two lat/lng points

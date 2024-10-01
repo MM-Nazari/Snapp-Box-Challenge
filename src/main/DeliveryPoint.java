@@ -1,9 +1,9 @@
-// Class to represent a Delivery Point
+package main;
 public class DeliveryPoint {
-    int idDelivery;
-    double lat;
-    double lng;
-    long timestamp;
+    public int idDelivery;
+    public double lat;
+    public double lng;
+    public long timestamp;
 
     // Constructor
     public DeliveryPoint(int idDelivery, double lat, double lng, long timestamp) {
