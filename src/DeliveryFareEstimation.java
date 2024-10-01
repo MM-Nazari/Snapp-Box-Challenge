@@ -112,37 +112,27 @@ public class DeliveryFareEstimation {
         String outputPath = "output.csv";// Path to the CSV file
 
         try {
+
             // Read the CSV data into a list of DeliveryPoint objects
             List<DeliveryPoint> deliveryPoints = readData(filePath);
 
-            // Filter out invalid points where speed > 100 km/h
-            List<DeliveryPoint> filteredPoints = filterInvalidPoints(deliveryPoints);
-
-            // Calculate the fare for the filtered points
-            double totalFare = calculateFare(filteredPoints);
-
-            // Print the delivery points to check the output
-            for (DeliveryPoint point : deliveryPoints) {
-                System.out.println(point);
-            }
-
-            System.out.println("///////////////////////");
-
-            // Print the valid delivery points after filtering
-            for (DeliveryPoint point : filteredPoints) {
-                System.out.println(point);
-            }
-
-            System.out.println("///////////////////////");
-
-            // Print the total calculated fare
-            System.out.println("\nTotal Fare: " + totalFare);
-
+            // List to store deleted records with their speeds
+            //List<String> deletedRecords = new ArrayList<>();
 
             // Group the points by id_delivery
             Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
             for (DeliveryPoint point : deliveryPoints) {
                 deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
+            }
+
+            // Print the grouped deliveries
+            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+                int idDelivery = entry.getKey();
+                List<DeliveryPoint> points = entry.getValue();
+                System.out.println("id_delivery: " + idDelivery);
+                for (DeliveryPoint deliveryPoint : points) {
+                    System.out.println("    " + deliveryPoint);
+                }
             }
 
             // Map to store fare estimates for each delivery
@@ -153,18 +143,89 @@ public class DeliveryFareEstimation {
                 int idDelivery = entry.getKey();
                 List<DeliveryPoint> points = entry.getValue();
 
-                // Filter out invalid points where speed > 100 km/h
-                //List<DeliveryPoint> filteredPoints = filterInvalidPoints(points, deletedRecords);
+                // Filter out invalid points where speed > 100 km/h for the current delivery only
+                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);  // Fix: Pass 'points' instead of 'deliveryPoints'
 
-                // Calculate the fare for the filtered points
+                // Calculate the fare for the filtered points of the current delivery
                 double fare = calculateFare(filteredPoints);
 
                 // Store the fare estimate for this delivery
                 fareEstimates.put(idDelivery, fare);
             }
 
+//            // Process each delivery and calculate the fare
+//            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+//                int idDelivery = entry.getKey();
+//                List<DeliveryPoint> points = entry.getValue();
+//
+//                // Filter out invalid points where speed > 100 km/h
+//                //List<DeliveryPoint> filteredPoints = filterInvalidPoints(points, deletedRecords);
+//                List<DeliveryPoint> filteredPoints = filterInvalidPoints(deliveryPoints);
+//
+//                // Calculate the fare for the filtered points
+//                double fare = calculateFare(filteredPoints);
+//
+//                // Store the fare estimate for this delivery
+//                fareEstimates.put(idDelivery, fare);
+//            }
+
             // Write the fare estimates to the output CSV file
             writeOutputToCSV(fareEstimates, outputPath);
+
+            System.out.println("Fare estimates have been written to: " + outputPath);
+//            // Read the CSV data into a list of DeliveryPoint objects
+//            List<DeliveryPoint> deliveryPoints = readData(filePath);
+//
+//            // Filter out invalid points where speed > 100 km/h
+//            List<DeliveryPoint> filteredPoints = filterInvalidPoints(deliveryPoints);
+//
+//            // Calculate the fare for the filtered points
+//            double totalFare = calculateFare(filteredPoints);
+//
+//            // Print the delivery points to check the output
+//            for (DeliveryPoint point : deliveryPoints) {
+//                System.out.println(point);
+//            }
+//
+//            System.out.println("///////////////////////");
+//
+//            // Print the valid delivery points after filtering
+//            for (DeliveryPoint point : filteredPoints) {
+//                System.out.println(point);
+//            }
+//
+//            System.out.println("///////////////////////");
+//
+//            // Print the total calculated fare
+//            System.out.println("\nTotal Fare: " + totalFare);
+//
+//
+//            // Group the points by id_delivery
+//            Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
+//            for (DeliveryPoint point : deliveryPoints) {
+//                deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
+//            }
+//
+//            // Map to store fare estimates for each delivery
+//            Map<Integer, Double> fareEstimates = new HashMap<>();
+//
+//            // Process each delivery and calculate the fare
+//            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+//                int idDelivery = entry.getKey();
+//                List<DeliveryPoint> points = entry.getValue();
+//
+//                // Filter out invalid points where speed > 100 km/h
+//                //List<DeliveryPoint> filteredPoints = filterInvalidPoints(points, deletedRecords);
+//
+//                // Calculate the fare for the filtered points
+//                double fare = calculateFare(filteredPoints);
+//
+//                // Store the fare estimate for this delivery
+//                fareEstimates.put(idDelivery, fare);
+//            }
+//
+//            // Write the fare estimates to the output CSV file
+//            writeOutputToCSV(fareEstimates, outputPath);
 
         } catch (IOException e) {
             e.printStackTrace();
