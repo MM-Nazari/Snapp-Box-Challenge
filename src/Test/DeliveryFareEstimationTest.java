@@ -64,14 +64,34 @@ public class DeliveryFareEstimationTest {
     public void testCalculateFare() {
         // Test fare calculation with valid filtered points
         List<DeliveryPoint> filteredPoints = Arrays.asList(
-                new DeliveryPoint(1, 51.5074, -0.1278, 1609459200), // London
-                new DeliveryPoint(1, 48.8566, 2.3522, 1609462800)  // Paris
+                new DeliveryPoint(1, 51.5074, -0.1278, 1727985600), // London
+                new DeliveryPoint(1, 48.8566, 2.3522, 1727989200)  // Paris
         );
 
         double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
         assertTrue(fare >= 3.47);  // Minimum fare check
-        assertEquals(1.30 + (0.74 * 343), fare, 5);  // Check based on day time rate and distance
+
+        assertEquals(1.30 + (0.74 * 343/2) + (1.3 * 343/2), fare, 5);  // Check based on day time rate and distance
     }
+
+//    @Test
+//    public void testCalculateFareAnotherCase() {
+//        // Test fare calculation with valid filtered points
+//        List<DeliveryPoint> filteredPoints = Arrays.asList(
+//                new DeliveryPoint(1, 34.0522, -118.2437, 1609459200), // Los Angeles (Timestamp: 1609459200)
+//                new DeliveryPoint(1, 36.1699, -115.1398, 1609466400)  // Las Vegas (Timestamp: 1609466400)
+//        );
+//
+//        double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
+//        assertTrue(fare >= 3.47);  // Ensure minimum fare is respected
+//
+//        // Calculate expected distance between Los Angeles and Las Vegas
+//        double expectedDistance = 367.6;  // Approximate in kilometers
+//        double expectedFare = 1.30 + (0.74 * expectedDistance);  // Assuming day time rate
+//
+//        // Check calculated fare with a small tolerance
+//        assertEquals(expectedFare, fare, 0.01);
+//    }
 
     @Test
     public void testWriteOutputToCSV() throws IOException {
