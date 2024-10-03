@@ -5,8 +5,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 
 public class DeliveryFareEstimation {
+
+    // Executor service to manage threads
+    private static final ExecutorService executor = Executors.newFixedThreadPool(4);  // Adjust pool size based on system
 
     // Method to read CSV and store it in a list of DeliveryPoint
     public static List<DeliveryPoint> readData(String filePath) throws IOException {
@@ -109,20 +113,47 @@ public class DeliveryFareEstimation {
         }
     }
 
+    // Task to process a batch of deliveries in parallel
+    public static class DeliveryTask implements Callable<Map<Integer, Double>> {
+        private final Map<Integer, List<DeliveryPoint>> deliveries;
+
+        public DeliveryTask(Map<Integer, List<DeliveryPoint>> deliveries) {
+            this.deliveries = deliveries;
+        }
+
+        @Override
+        public Map<Integer, Double> call() {
+            Map<Integer, Double> fareEstimates = new HashMap<>();
+
+            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+                int idDelivery = entry.getKey();
+                List<DeliveryPoint> points = entry.getValue();
+
+                // Filter out invalid points where speed > 100 km/h
+                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);
+
+                // Calculate the fare for the filtered points
+                double fare = calculateFare(filteredPoints);
+
+                // Store the fare estimate for this delivery
+                fareEstimates.put(idDelivery, fare);
+            }
+
+            return fareEstimates;
+        }
+    }
+
+
     public static void main(String[] args) {
-        String filePath = "src/sample_data.csv";
+        String filePath = "src/expanded_delivery_data.csv";
         String outputPath = "output.csv";// Path to the CSV file
 
         try {
-
-            // Measure time without cache
+//             Measure time without cache
             long startTime = System.nanoTime();
 
             // Read the CSV data into a list of DeliveryPoint objects
             List<DeliveryPoint> deliveryPoints = readData(filePath);
-
-            // List to store deleted records with their speeds
-            //List<String> deletedRecords = new ArrayList<>();
 
             // Group the points by id_delivery
             Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
@@ -130,38 +161,38 @@ public class DeliveryFareEstimation {
                 deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
             }
 
-            // Print the grouped deliveries
+            // Split the deliveries into batches for multithreading
+            List<Map<Integer, List<DeliveryPoint>>> batches = new ArrayList<>();
+            int batchSize = deliveries.size() / 4;  // Divide the deliveries for each thread (4 threads in this case)
+            Map<Integer, List<DeliveryPoint>> currentBatch = new HashMap<>();
+            int count = 0;
+
             for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
-                int idDelivery = entry.getKey();
-                List<DeliveryPoint> points = entry.getValue();
-                System.out.println("id_delivery: " + idDelivery);
-                for (DeliveryPoint deliveryPoint : points) {
-                    System.out.println("    " + deliveryPoint);
+                currentBatch.put(entry.getKey(), entry.getValue());
+                count++;
+                if (count % batchSize == 0) {
+                    batches.add(new HashMap<>(currentBatch));
+                    currentBatch.clear();
                 }
             }
-
-            // Map to store fare estimates for each delivery
-            Map<Integer, Double> fareEstimates = new HashMap<>();
-
-            // Process each delivery and calculate the fare
-            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
-                int idDelivery = entry.getKey();
-                List<DeliveryPoint> points = entry.getValue();
-
-                // Filter out invalid points where speed > 100 km/h for the current delivery only
-                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);  // Fix: Pass 'points' instead of 'deliveryPoints'
-
-                // Calculate the fare for the filtered points of the current delivery
-                double fare = calculateFare(filteredPoints);
-
-                // Store the fare estimate for this delivery
-                fareEstimates.put(idDelivery, fare);
+            if (!currentBatch.isEmpty()) {
+                batches.add(new HashMap<>(currentBatch)); // Add any remaining deliveries
             }
 
+            // Submit tasks to the thread pool
+            List<Future<Map<Integer, Double>>> futures = new ArrayList<>();
+            for (Map<Integer, List<DeliveryPoint>> batch : batches) {
+                futures.add(executor.submit(new DeliveryTask(batch)));
+            }
+
+            // Collect the results
+            Map<Integer, Double> finalFareEstimates = new HashMap<>();
+            for (Future<Map<Integer, Double>> future : futures) {
+                finalFareEstimates.putAll(future.get()); // Merging all fare estimates from each thread
+            }
 
             // Write the fare estimates to the output CSV file
-            writeOutputToCSV(fareEstimates, outputPath);
-
+            writeOutputToCSV(finalFareEstimates, outputPath);
 
             System.out.println("Fare estimates have been written to: " + outputPath);
 
@@ -169,10 +200,72 @@ public class DeliveryFareEstimation {
             long totalTime = endTime - startTime;
             System.out.println("Execution time: " + totalTime / 1_000_000 + " ms");
 
-
-
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException | ExecutionException e) {
             e.printStackTrace();
+        } finally {
+            executor.shutdown();
         }
+
+//        try {
+//
+//            // Measure time without cache
+//            long startTime = System.nanoTime();
+//
+//            // Read the CSV data into a list of DeliveryPoint objects
+//            List<DeliveryPoint> deliveryPoints = readData(filePath);
+//
+//            // List to store deleted records with their speeds
+//            //List<String> deletedRecords = new ArrayList<>();
+//
+//            // Group the points by id_delivery
+//            Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
+//            for (DeliveryPoint point : deliveryPoints) {
+//                deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
+//            }
+//
+//            // Print the grouped deliveries
+////            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+////                int idDelivery = entry.getKey();
+////                List<DeliveryPoint> points = entry.getValue();
+////                System.out.println("id_delivery: " + idDelivery);
+////                for (DeliveryPoint deliveryPoint : points) {
+////                    System.out.println("    " + deliveryPoint);
+////                }
+////            }
+//
+//            // Map to store fare estimates for each delivery
+//            Map<Integer, Double> fareEstimates = new HashMap<>();
+//
+//            // Process each delivery and calculate the fare
+//            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+//                int idDelivery = entry.getKey();
+//                List<DeliveryPoint> points = entry.getValue();
+//
+//                // Filter out invalid points where speed > 100 km/h for the current delivery only
+//                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);  // Fix: Pass 'points' instead of 'deliveryPoints'
+//
+//                // Calculate the fare for the filtered points of the current delivery
+//                double fare = calculateFare(filteredPoints);
+//
+//                // Store the fare estimate for this delivery
+//                fareEstimates.put(idDelivery, fare);
+//            }
+//
+//
+//            // Write the fare estimates to the output CSV file
+//            writeOutputToCSV(fareEstimates, outputPath);
+//
+//
+//            System.out.println("Fare estimates have been written to: " + outputPath);
+//
+//            long endTime = System.nanoTime();
+//            long totalTime = endTime - startTime;
+//            System.out.println("Execution time: " + totalTime / 1_000_000 + " ms");
+//
+//
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
     }
 }
