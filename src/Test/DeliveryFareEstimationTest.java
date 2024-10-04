@@ -61,8 +61,8 @@ public class DeliveryFareEstimationTest {
     }
 
     @Test
-    public void testCalculateFare() {
-        // Test fare calculation with valid filtered points
+    public void testCalculateFareEdgeCaseNightToDay() {
+        // Test fare calculation with valid filtered points 11:30 pm to 00:30 am
         List<DeliveryPoint> filteredPoints = Arrays.asList(
                 new DeliveryPoint(1, 51.5074, -0.1278, 1727985600), // London
                 new DeliveryPoint(1, 48.8566, 2.3522, 1727989200)  // Paris
@@ -71,7 +71,67 @@ public class DeliveryFareEstimationTest {
         double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
         assertTrue(fare >= 3.47);  // Minimum fare check
 
-        assertEquals(1.30 + (0.74 * 343/2) + (1.3 * 343/2), fare, 5);  // Check based on day time rate and distance
+        assertEquals(1.30 + (0.74 * (343 / 2)) + (1.3 * (343 / 2)), fare, 5);  // Check based on day time rate and distance
+    }
+
+    @Test
+    public void testCalculateFareDay() {
+        // Test fare calculation with valid filtered points 1:00 pm to 2:00 pm
+        List<DeliveryPoint> filteredPoints = Arrays.asList(
+                new DeliveryPoint(1, 51.5074, -0.1278, 1728034200), // London
+                new DeliveryPoint(1, 48.8566, 2.3522, 1728037800)  // Paris
+        );
+
+        double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
+        assertTrue(fare >= 3.47);  // Minimum fare check
+
+
+
+        assertEquals(1.30 + (0.74 * 343), fare, 5);  // Check based on day time rate and distance
+    }
+
+    @Test
+    public void testCalculateFareNight() {
+        // Test fare calculation with valid filtered points 2:00 am to 3:00 am
+        List<DeliveryPoint> filteredPoints = Arrays.asList(
+                new DeliveryPoint(1, 51.5074, -0.1278, 1727821800), // London
+                new DeliveryPoint(1, 48.8566, 2.3522, 1727825400)  // Paris
+        );
+
+        double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
+        assertTrue(fare >= 3.47);  // Minimum fare check
+
+
+
+        assertEquals(1.30 + (1.3 * 343), fare, 5);  // Check based on day time rate and distance
+    }
+
+    @Test
+    public void testCalculateFareEdgeCaseDayToNight() {
+        // Test fare calculation with valid filtered points 4:30 am to 5:30 am
+        List<DeliveryPoint> filteredPoints = Arrays.asList(
+                new DeliveryPoint(1, 51.5074, -0.1278, 1727830800), // London
+                new DeliveryPoint(1, 48.8566, 2.3522, 1727834400)  // Paris
+        );
+
+        double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
+        assertTrue(fare >= 3.47);  // Minimum fare check
+
+        assertEquals(1.30 + (0.74 * (343 / 2)) + (1.3 * (343 / 2)), fare, 5);  // Check based on day time rate and distance
+    }
+
+    @Test
+    public void testCalculateFareIdle() {
+        // Test fare calculation with valid filtered points 4:30 am to 5:30 am
+        List<DeliveryPoint> filteredPoints = Arrays.asList(
+                new DeliveryPoint(1, 51.5074, -0.1278, 1727830800), // London
+                new DeliveryPoint(1, 51.5074, -0.1278, 1727834400)  // London
+        );
+
+        double fare = DeliveryFareEstimation.calculateFare(filteredPoints);
+        assertTrue(fare >= 3.47);  // Minimum fare check
+
+        assertEquals(1.30 + (11.9 * 1.0), fare, 5);  // Check based on day time rate and distance
     }
 
 //    @Test

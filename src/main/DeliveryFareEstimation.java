@@ -13,7 +13,7 @@ public class DeliveryFareEstimation {
 
 
     // Executor service to manage threads
-    private static final ExecutorService executor = Executors.newFixedThreadPool(4);  // Adjust pool size based on system
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3);  // Adjust pool size based on system
 
     // Method to read CSV and store it in a list of DeliveryPoint
     public static List<DeliveryPoint> readData(String filePath) throws IOException {
@@ -78,160 +78,86 @@ public class DeliveryFareEstimation {
             // Calculate the time difference (in hours)
             double timeDifferenceInHours = (p2.timestamp - p1.timestamp) / 3600.0; // Seconds to hours
 
-            System.out.println(timeDifferenceInHours);
-
-            // Extract hour of day from both timestamps
-            //int hourOfDayStart = (int) ((p1.timestamp % 86400) / 3600);
-            // Extract the hour of day
-            // Convert timestamps to LocalDateTime in the specified timezone
-
-            // Assuming you are working with Iran Time (IRDT/IRST)
-//            ZoneId zoneId = ZoneId.of("Asia/Tehran");
-//
-//            LocalDateTime startDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p1.timestamp), zoneId);
-//            LocalDateTime endDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p2.timestamp), zoneId);
-//
-//            int hourOfDayStart = startDateTime.getHour();
-//            int hourOfDayEnd = endDateTime.getHour();
-//            System.out.println(hourOfDayStart);
-//              int hourOfDayEnd = (int) ((p2.timestamp % 86400) / 3600);
-//              int hourOfDayStart = (int) ((p1.timestamp % 86400) / 3600);
-//            System.out.println(hourOfDayEnd);
-
-//// Assuming you are working with Iran Time (IRDT/IRST)
-//            ZoneId zoneId = ZoneId.of("Asia/Tehran");
-//
-//// Convert timestamps to LocalDateTime in the specified timezone
-//            LocalDateTime startDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p1.timestamp), zoneId);
-//            LocalDateTime endDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p2.timestamp), zoneId);
 
             // Convert timestamps to LocalDateTime in the specified timezone (Tehran)
             ZoneId zoneId = ZoneId.of("Asia/Tehran");
             LocalDateTime startTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p1.timestamp), zoneId);
+
             LocalDateTime endTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p2.timestamp), zoneId);
 
             // Calculate total time difference in hours
             double totalDurationInHours = Duration.between(startTime, endTime).toMinutes() / 60.0;
 
-            // Calculate distance between the points
-            //double distance = DistanceCalculator.haversine(p1.lat, p1.lng, p2.lat, p2.lng);
+            LocalTime nightStart = LocalTime.of(0, 0,0,1);
+            LocalTime nightEnd = LocalTime.of(5, 0,0,0);
 
-            // Define the fare periods (Night: 00:00 to 5:00, Day: 5:00 to 24:00)
-            LocalTime nightEnd = LocalTime.of(5, 0);
-            LocalTime dayStart = LocalTime.of(5, 0);
-            LocalTime midnight = LocalTime.of(0, 0);
+            LocalTime dayStart = LocalTime.of(5, 0,0, 1);
+            LocalTime dayEnd = LocalTime.of(23, 59,59,59);
 
-            // Check if the trip crosses from day to night or vice versa
-            if (startTime.toLocalTime().isBefore(nightEnd) && endTime.toLocalTime().isAfter(dayStart)) {
-                // Trip spans both night and day
+            LocalTime midnight = LocalTime.of(0, 0, 0);
 
-                // Calculate time spent at night (from start to 5:00 AM)
-                double nighttimeDuration = Duration.between(startTime.toLocalTime(), nightEnd).toMinutes() / 60.0;
-                double daytimeDuration = totalDurationInHours - nighttimeDuration; // The rest is daytime
-
-                fare += nighttimeDuration * distance * 1.3; // Apply night rate
-                fare += daytimeDuration * distance * 0.74; // Apply day rate
-
-            } else if (startTime.toLocalTime().isAfter(dayStart) && endTime.toLocalTime().isBefore(midnight)) {
-                // Entire trip during the day
-                fare += totalDurationInHours * distance * 0.74;
-
-            } else if (startTime.toLocalTime().isBefore(dayStart) && endTime.toLocalTime().isBefore(dayStart)) {
-                // Entire trip during the night
-                fare += totalDurationInHours * distance * 1.3;
-
+            if (speed <= 10) {
+                // Apply 11.9 units per hour when speed is <= 10 km/h
+                fare = totalDurationInHours * 11.9;
             } else {
-                // Trip crosses midnight (for example, from 11:30 PM to 12:30 AM)
 
-                // Calculate time before midnight
-                double preMidnightDuration = Duration.between(startTime.toLocalTime(), midnight).toMinutes() / 60.0;
-                double postMidnightDuration = totalDurationInHours - preMidnightDuration;
+                // Check if the trip spans from night to day (before 5:00 AM to after 5:00 AM)
+                if (startTime.toLocalTime().isBefore(nightEnd) && startTime.toLocalTime().isAfter(nightStart) && endTime.toLocalTime().isAfter(dayStart) && endTime.toLocalTime().isBefore(dayEnd)) {
+                    // Trip spans both night and day
+                    double nighttimeDuration = Duration.between(startTime.toLocalTime(), nightEnd).toMinutes() / 60.0;
+                    double daytimeDuration = Duration.between(dayStart, endTime.toLocalTime()).toMinutes() / 60.0;
+                    fare += nighttimeDuration * distance * 1.3;  // Night rate
+                    fare += daytimeDuration * distance * 0.74;   // Day rate
 
-                fare += preMidnightDuration * distance * 0.74; // Apply night rate for time before midnight
-                fare += postMidnightDuration * distance * 1.3; // Apply day rate for time after midnight
+                } else if (startTime.toLocalTime().isAfter(dayStart) && endTime.toLocalTime().isBefore(dayEnd) && !endTime.toLocalTime().isBefore(startTime.toLocalTime())) {
+                    // Entire trip during the day
+                    double daytimeDuration = Duration.between(startTime.toLocalTime(), dayEnd).toMinutes() / 60.0;
+                    //fare += totalDurationInHours * distance * 0.74;
+                    fare += distance * 0.74;
+
+                } else if (startTime.toLocalTime().isAfter(nightStart) && endTime.toLocalTime().isBefore(nightEnd) && !endTime.toLocalTime().isBefore(startTime.toLocalTime()) ) {
+                    // Entire trip during the night
+                    fare += distance * 1.3;
+
+                } else if (startTime.toLocalTime().isAfter(dayStart) && startTime.toLocalTime().isBefore(dayEnd) && endTime.toLocalTime().isAfter(nightStart) && endTime.toLocalTime().isBefore(nightEnd)) {
+                    // Trip starts during the day and ends after midnight (spans two days)
+
+                    // Adjust midnight to the next day's midnight
+                    LocalDateTime adjustedMidnight = startTime.toLocalDate().plusDays(1).atTime(midnight);
+
+                    // Calculate the duration before midnight (day portion)
+                    double daytimeDuration = Duration.between(startTime, adjustedMidnight).toMinutes() / 60.0;
+
+                    // Calculate the duration after midnight (night portion)
+                    double nighttimeDuration = Duration.between(adjustedMidnight, endTime).toMinutes() / 60.0;
+
+                    // Apply day rate for daytime portion and night rate for nighttime portion
+                    fare += daytimeDuration * distance * 0.74;
+                    fare += nighttimeDuration * distance * 1.3;
+
+                } else {
+                   // Trip crosses midnight (for example, from 11:30 PM to 12:30 AM)
+
+                    // Calculate time before midnight
+                    double preMidnightDuration = Duration.between(startTime.toLocalTime(), midnight).toMinutes() / 60.0;
+                    double postMidnightDuration = totalDurationInHours - preMidnightDuration;
+
+                    fare += preMidnightDuration * distance * 0.74;  // Apply day rate for time before midnight
+                    fare += postMidnightDuration * distance * 1.3;  // Apply night rate for time after midnight
+                }
             }
-        }
 
-        // Ensure the minimum fare is 3.47 units
-        if (fare < 3.47) {
-            fare = 3.47;
+            // Ensure the minimum fare is 3.47 units
+            if (fare < 3.47) {
+                fare = 3.47;
+            }
+
+
         }
 
         return fare;
-    }
 
-//            // For London
-//            ZoneId londonZoneId = ZoneId.of("Europe/London");
-//
-//// For Paris
-//            ZoneId parisZoneId = ZoneId.of("Europe/Paris");
-//
-//// Convert timestamps to LocalDateTime
-//            LocalDateTime startDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p1.timestamp), londonZoneId);
-//            LocalDateTime endDateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(p2.timestamp), londonZoneId);
-// Extract hours and minutes
-//            int hourOfDayStart = startDateTime.getHour();
-//            int hourOfDayEnd = endDateTime.getHour();
-//            System.out.println(hourOfDayStart);
-//            System.out.println(hourOfDayEnd);
-//
-//
-//// Calculate the total duration in hours
-//            double totalDuration = (double) Duration.between(startDateTime, endDateTime).toMinutes() / 60.0;
-//            System.out.println(totalDuration);
-//// Apply pricing rules based on speed and time of the day
-//            if (speed > 10) {
-//                // Daytime rate is from 5 AM to 12 AM (midnight)
-//                if (hourOfDayStart < 5 && hourOfDayEnd > 5) {
-//                    // Trip starts at night and ends during the day
-//                    double nighttimeDuration = 5 - hourOfDayStart; // Duration at night
-//                    double daytimeDuration = totalDuration - nighttimeDuration; // Duration during the day
-//                    fare += nighttimeDuration * distance * 1.3; // Nighttime rate
-//                    fare += daytimeDuration * distance * 0.74; // Daytime rate
-//                } else if (hourOfDayStart >= 5 && hourOfDayEnd <= 24) {
-//                    // Entire trip during the day
-//                    fare += totalDuration * distance * 0.74;
-//                } else {
-//                    // Entire trip at night
-//                    fare += totalDuration * distance * 1.3;
-//                }
-//            } else {
-//                // Rule 3: Low speed fare (11.9 units per hour)
-//                fare += totalDuration * 11.9;
-//            }
-//
-//// Ensure the minimum fare is 3.47 units
-//            if (fare < 3.47) {
-//                fare = 3.47;
-//            }
-//
-////            // Extract the hour of the day from the timestamp (assuming Unix timestamp in seconds)
-////             int hourOfDay = (int) ((p1.timestamp % 86400) / 3600); // Seconds to hours in a day
-////           // int hourOfDay = (int) (((p1.timestamp + (3 * 3600 + 30 * 60)) % 86400) / 3600);
-////
-////
-////            // Apply pricing rules based on speed and time of the day
-////            if (speed > 10) {
-////                if (hourOfDay > 5 && hourOfDay <= 24) {
-////                    // Rule 1: Day time rate (0.74 units per km)
-////                    fare += distance * 0.74;
-////                } else {
-////                    // Rule 2: Night time rate (1.3 units per km)
-////                    fare += distance * 1.3;
-////                }
-////            } else {
-////                // Rule 3: Low speed fare (11.9 units per hour)
-////                fare += timeDifferenceInHours * 11.9;
-////            }
-//        }
-//
-//        // Ensure the minimum fare is 3.47 units
-//        if (fare < 3.47) {
-//            fare = 3.47;
-//        }
-//
-//        return fare;
-//    }
+    }
 
     // Method to write the output to a CSV file
     public static void writeOutputToCSV(Map<Integer, Double> fareEstimates, String outputPath) {
@@ -277,8 +203,56 @@ public class DeliveryFareEstimation {
 
 
     public static void main(String[] args) {
-        String filePath = "src/expanded_delivery_data.csv";
+        String filePath = "src/sample_data.csv";
+        //String filePath = "src/expanded_delivery_data.csv";
         String outputPath = "output.csv";// Path to the CSV file
+
+//        try {
+//
+//            //             Measure time without cache
+//            long startTime = System.nanoTime();
+//            // Read the CSV data into a list of DeliveryPoint objects
+//            List<DeliveryPoint> deliveryPoints = readData(filePath);
+//
+//            // Filter out invalid points where speed > 100 km/h
+//            //List<DeliveryPoint> filteredPoints = filterInvalidPoints(deliveryPoints);
+//
+//            // Group the points by id_delivery
+//            Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
+//            for (DeliveryPoint point : deliveryPoints) {
+//                deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
+//            }
+//
+//            // Map to store fare estimates for each delivery
+//            Map<Integer, Double> fareEstimates = new HashMap<>();
+//
+//            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
+//                int idDelivery = entry.getKey();
+//                List<DeliveryPoint> points = entry.getValue();
+//
+//                // Filter out invalid points where speed > 100 km/h
+//                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);
+//
+//                // Calculate the fare for the filtered points
+//                double fare = calculateFare(filteredPoints);
+//
+//                // Store the fare estimate for this delivery
+//                fareEstimates.put(idDelivery, fare);
+//            }
+//
+//
+//        // Write the fare estimates to the output CSV file
+//        writeOutputToCSV(fareEstimates, outputPath);
+//
+//        System.out.println("Fare estimates have been written to: " + outputPath);
+//
+//        long endTime = System.nanoTime();
+//        long totalTime = endTime - startTime;
+//        System.out.println("Execution time: " + totalTime / 1_000_000 + " ms");
+//
+//    } catch (IOException e) {
+//        e.printStackTrace();
+//    }
 
         try {
 //             Measure time without cache
@@ -295,7 +269,7 @@ public class DeliveryFareEstimation {
 
             // Split the deliveries into batches for multithreading
             List<Map<Integer, List<DeliveryPoint>>> batches = new ArrayList<>();
-            int batchSize = deliveries.size() / 4;  // Divide the deliveries for each thread (4 threads in this case)
+            int batchSize = deliveries.size() / 3;  // Divide the deliveries for each thread (4 threads in this case)
             Map<Integer, List<DeliveryPoint>> currentBatch = new HashMap<>();
             int count = 0;
 
@@ -338,66 +312,7 @@ public class DeliveryFareEstimation {
             executor.shutdown();
         }
 
-//        try {
-//
-//            // Measure time without cache
-//            long startTime = System.nanoTime();
-//
-//            // Read the CSV data into a list of DeliveryPoint objects
-//            List<DeliveryPoint> deliveryPoints = readData(filePath);
-//
-//            // List to store deleted records with their speeds
-//            //List<String> deletedRecords = new ArrayList<>();
-//
-//            // Group the points by id_delivery
-//            Map<Integer, List<DeliveryPoint>> deliveries = new HashMap<>();
-//            for (DeliveryPoint point : deliveryPoints) {
-//                deliveries.computeIfAbsent(point.idDelivery, k -> new ArrayList<>()).add(point);
-//            }
-//
-//            // Print the grouped deliveries
-////            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
-////                int idDelivery = entry.getKey();
-////                List<DeliveryPoint> points = entry.getValue();
-////                System.out.println("id_delivery: " + idDelivery);
-////                for (DeliveryPoint deliveryPoint : points) {
-////                    System.out.println("    " + deliveryPoint);
-////                }
-////            }
-//
-//            // Map to store fare estimates for each delivery
-//            Map<Integer, Double> fareEstimates = new HashMap<>();
-//
-//            // Process each delivery and calculate the fare
-//            for (Map.Entry<Integer, List<DeliveryPoint>> entry : deliveries.entrySet()) {
-//                int idDelivery = entry.getKey();
-//                List<DeliveryPoint> points = entry.getValue();
-//
-//                // Filter out invalid points where speed > 100 km/h for the current delivery only
-//                List<DeliveryPoint> filteredPoints = filterInvalidPoints(points);  // Fix: Pass 'points' instead of 'deliveryPoints'
-//
-//                // Calculate the fare for the filtered points of the current delivery
-//                double fare = calculateFare(filteredPoints);
-//
-//                // Store the fare estimate for this delivery
-//                fareEstimates.put(idDelivery, fare);
-//            }
-//
-//
-//            // Write the fare estimates to the output CSV file
-//            writeOutputToCSV(fareEstimates, outputPath);
-//
-//
-//            System.out.println("Fare estimates have been written to: " + outputPath);
-//
-//            long endTime = System.nanoTime();
-//            long totalTime = endTime - startTime;
-//            System.out.println("Execution time: " + totalTime / 1_000_000 + " ms");
-//
-//
-//
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
+
+
     }
 }

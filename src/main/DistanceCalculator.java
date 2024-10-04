@@ -80,7 +80,7 @@ public class DistanceCalculator {
         double distance = R * c; // convert to kilometers
 
         // Store the result in the cache
-        distanceCache.put(cacheKey, distance);
+        //distanceCache.put(cacheKey, distance);
         //saveCacheToFile();
         return distance;
     }
