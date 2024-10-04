@@ -12,12 +12,12 @@ The Report is provided in [Project Report](./Snapp-Box-Report.pdf)
 ## Dependencies
 This project uses the following libraries and components:
 
-- **HashMap**: A collection class that implements the Map interface, allowing storage of key-value pairs.
-- **Executor**: A framework for managing and controlling thread execution in concurrent programming.
-- **JUnit**: A widely used testing framework for Java, allowing for the creation and execution of test cases.
-- **BufferedReader**: A class used for reading the text from a character input stream, enhancing efficiency.
-- **LocalTime**: Part of the Java Date and Time API, used for representing time without a time zone.
-- **Callable**: A functional interface that can be used to execute tasks that return a result and may throw exceptions.
+- [HashMap](https://docs.oracle.com/javase/8/docs/api/java/util/HashMap.html)
+- [Executor](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Executor.html)
+- [JUnit](https://junit.org/junit5/)
+- [BufferedReader](https://docs.oracle.com/javase/8/docs/api/java/io/BufferedReader.html)
+- [LocalTime](https://docs.oracle.com/javase/8/docs/api/java/time/LocalTime.html)
+- [Callable](https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Callable.html)
   
 ## IDE
 This project is developed using IntelliJ.
